@@ -40,10 +40,19 @@ npm run dev
 ```
 
 ## 🛠️ Features
-- **Real-time Map**: Global visualization of disaster events using Leaflet.
-- **Spike Detection Engine**: Python-based Z-score analysis for stock price anomalies.
-- **Live Intelligence Feed**: Real-time alerts via WebSockets.
-- **Sector Mapping**: Intelligent mapping of disaster types (Hurricanes, Earthquakes) to relevant stock sectors (Energy, Logistics, Insurance).
+
+### Bloomberg-Style Intelligence
+- **Event Drill-Down**: Interactive slide-in panels provides deep-dive analytics on specific disaster events.
+- **Alpha Predictions**: Quantitative estimates of stock movement based on historical correlation.
+- **Sparkline Visuals**: Real-time trend charts for all tracked assets.
+- **Consistency Tracking**: Intelligence-driven ranking of companies that frequently react to specific disaster types.
+- **Smart Stream**: Notifications that explain *why* an event matters to specific sectors.
+
+### 🌍 Real-Time Ingestion
+- **USGS**: Magnitude 3.0+ seismic event monitoring.
+- **NASA FIRMS**: VIIRS thermal anomaly (wildfire) detection.
+- **NOAA**: Active severe weather and hurricane alerts.
+- **Yahoo Finance**: High-frequency price data for quantitative analysis.
 
 ## 🗃️ Database Schema
 The system uses PostgreSQL for structured data:
