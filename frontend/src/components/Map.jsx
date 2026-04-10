@@ -5,11 +5,7 @@ import useStore from '../store/useStore';
 
 const DisasterMap = ({ events = [] }) => {
   const center = [20, 0];
-  const { setSelectedEvent, activeFilter } = useStore();
-
-  const filteredEvents = activeFilter === 'all' 
-    ? events 
-    : events.filter(e => e.type === activeFilter);
+  const { setSelectedEvent } = useStore();
 
   return (
     <div className="h-full w-full relative group">
@@ -18,7 +14,7 @@ const DisasterMap = ({ events = [] }) => {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; CARTO'
         />
-        {filteredEvents.map((event) => (
+        {events.map((event) => (
           <React.Fragment key={event.id}>
             <Marker 
               position={[event.latitude, event.longitude]}

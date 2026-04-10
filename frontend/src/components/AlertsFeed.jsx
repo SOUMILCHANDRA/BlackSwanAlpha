@@ -13,7 +13,10 @@ const AlertsFeed = ({ alerts = [] }) => {
       <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-hide">
         {alerts.length === 0 && <p className="text-white/20 text-center py-8 text-xs italic">Awaiting predictive signals...</p>}
         {alerts.map((alert, i) => (
-          <div key={i} className={`p-4 rounded-xl border transition-all hover:bg-white/[0.02] ${
+          <div 
+            key={i} 
+            onClick={() => onAlertClick && onAlertClick(alert)}
+            className={`p-4 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.04] active:scale-[0.98] ${
             alert.severity === 'high' ? 'bg-danger/5 border-danger/20' : 'bg-white/5 border-white/10'
           }`}>
             <div className="flex gap-3">
