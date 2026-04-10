@@ -12,11 +12,27 @@ import io from 'socket.io-client';
 const socket = io('http://localhost:5000');
 
 function App() {
-  const { setSelectedEvent } = useStore();
-  const [events, setEvents] = useState([
+  const { 
+    setSelectedEvent, 
+    activeFilter, 
+    timeWindow, 
+    setTimeWindow,
+    searchQuery,
+    setSearchQuery,
+  } = useStore();
+
+  const [rawEvents, setRawEvents] = useState([
     { id: '1', type: 'earthquake', magnitude: 7.4, latitude: 35.6895, longitude: 139.6917, region: 'Tokyo, Japan', timestamp: '10m ago' },
     { id: '2', type: 'wildfire', magnitude: 342, latitude: 34.0522, longitude: -118.2437, region: 'Los Angeles, USA', timestamp: '25m ago' },
   ]);
+
+  // Derived State: Filtering Logic with Search & Type
+  const filteredEvents = rawEvents.filter(e => {
+    const matchesFilter = activeFilter === 'all' || e.type === activeFilter;
+    const matchesSearch = e.region.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          e.type.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
   const [stocks, setStocks] = useState([
     { 
@@ -55,12 +71,14 @@ function App() {
 
   const [alerts, setAlerts] = useState([
     { 
+      eventId: '1',
       message: 'Critical: 7.4 Earthquake in Tokyo. Industrial equipment sectors historically surge +4% within 48h repair window.', 
       severity: 'high', 
       timestamp: '10:45 PM',
       impactedTickers: ['CAT', 'URI']
     },
     { 
+      eventId: '2',
       message: 'Wildfire alert in SoCal. Energy infrastructure exposed; monitoring NEE and POWI for short-term volatility.', 
       severity: 'medium', 
       timestamp: '10:30 PM',
@@ -70,7 +88,7 @@ function App() {
 
   useEffect(() => {
     socket.on('new_disaster', (event) => {
-      setEvents(prev => [event, ...prev]);
+      setRawEvents(prev => [event, ...prev]);
     });
 
     socket.on('stock_anomaly', (anomaly) => {
@@ -85,11 +103,16 @@ function App() {
     return () => socket.off();
   }, []);
 
+  const handleAlertClick = (alert) => {
+    const event = rawEvents.find(e => e.id === alert.eventId);
+    if (event) setSelectedEvent(event);
+  };
+
   return (
     <div className="flex bg-background h-screen text-white overflow-hidden font-sans selection:bg-accent/30">
       {/* Sidebar - Bloomberg Inspired */}
-      <div className="w-16 border-r border-white/5 flex flex-col items-center py-6 gap-8 bg-card/80 backdrop-blur-xl z-10">
-        <div className="p-2 bg-accent rounded-lg mb-6 shadow-lg shadow-accent/20 cursor-pointer hover:scale-105 transition-transform">
+      <div className="w-16 border-r border-white/5 flex flex-col items-center py-6 gap-8 bg-card/80 backdrop-blur-xl z-10 transition-all">
+        <div className="p-2 bg-accent rounded-lg mb-6 shadow-lg shadow-accent/20 cursor-pointer hover:scale-105 active:scale-95 transition-all">
           <Globe size={24} />
         </div>
         <div className="flex flex-col gap-6 text-white/30">
@@ -99,8 +122,8 @@ function App() {
           <div className="p-2 hover:bg-white/5 hover:text-white rounded-lg transition-all cursor-pointer"><History size={20} /></div>
         </div>
         <div className="mt-auto flex flex-col gap-6 text-white/30">
-          <Settings size={18} className="hover:text-white cursor-pointer" />
-          <User size={18} className="hover:text-white cursor-pointer" />
+          <Settings size={18} className="hover:text-white cursor-pointer transition-colors" />
+          <User size={18} className="hover:text-white cursor-pointer transition-colors" />
         </div>
       </div>
 
@@ -109,7 +132,7 @@ function App() {
         {/* Superior Header */}
         <header className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-card/40 backdrop-blur-md">
           <div className="flex items-center gap-6">
-            <h1 className="text-lg font-black tracking-[-0.05em] flex items-center gap-2">
+            <h1 className="text-lg font-black tracking-[-0.05em] flex items-center gap-2 select-none">
               BLACKSWAN <span className="text-accent italic font-light tracking-tighter text-xl">ALPHA</span>
             </h1>
             <div className="h-4 w-px bg-white/10" />
@@ -117,8 +140,10 @@ function App() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={14} />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search events, tickers, or coords..." 
-                className="bg-white/5 border border-white/5 rounded-full py-1.5 pl-9 pr-4 text-xs w-64 focus:outline-none focus:border-accent/40 transition-all font-medium"
+                className="bg-white/5 border border-white/5 rounded-full py-1.5 pl-9 pr-4 text-xs w-64 focus:outline-none focus:border-accent/40 focus:bg-white/10 transition-all font-medium"
               />
             </div>
           </div>
@@ -136,9 +161,17 @@ function App() {
           {/* Filtering Bar */}
           <div className="col-span-12 row-span-1 flex items-center justify-between gap-4">
              <FiltersBar />
-             <div className="flex gap-2">
+             <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5">
                 {['1H', '6H', '24H', '48H'].map(t => (
-                  <button key={t} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border ${t === '24H' ? 'bg-white/10 border-white/20 text-white' : 'border-transparent text-white/30 hover:text-white/60'}`}>
+                  <button 
+                    key={t} 
+                    onClick={() => setTimeWindow(t)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                      timeWindow === t 
+                      ? 'bg-white/15 border-white/20 text-white shadow-inner' 
+                      : 'border-transparent text-white/30 hover:text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     {t}
                   </button>
                 ))}
@@ -148,19 +181,19 @@ function App() {
           {/* Core Visualizer */}
           <div className="col-span-12 xl:col-span-8 row-span-5 grid grid-rows-5 gap-4">
             <div className="row-span-4 bg-card rounded-2xl border border-white/10 shadow-2xl overflow-hidden relative border-t-accent/20">
-              <Map events={events} />
+              <Map events={filteredEvents} />
             </div>
             
             {/* Metric Strip */}
             <div className="row-span-1 grid grid-cols-4 gap-4">
               {[
-                { label: 'Active Disasters', value: events.length, color: 'text-white' },
-                { label: 'Anomalies (24h)', value: '07', color: 'text-danger' },
+                { label: 'Active Events', value: filteredEvents.length, color: 'text-white' },
+                { label: 'Market Anomalies', value: '07', color: 'text-danger' },
                 { label: 'Alpha Signal', value: 'Strong', color: 'text-accent' },
-                { label: 'System Confidence', value: '94.2%', color: 'text-success' },
+                { label: 'System Health', value: '94.2%', color: 'text-success' },
               ].map((stat, i) => (
-                <div key={i} className="bg-card/40 hover:bg-card/60 rounded-2xl border border-white/5 p-4 flex flex-col justify-center transition-colors">
-                  <span className="text-[10px] uppercase tracking-widest text-white/30 font-bold mb-1">{stat.label}</span>
+                <div key={i} className="bg-card/40 hover:bg-card/60 rounded-2xl border border-white/5 p-4 flex flex-col justify-center transition-all cursor-default group">
+                  <span className="text-[10px] uppercase tracking-widest text-white/30 font-bold mb-1 group-hover:text-white/50 transition-colors">{stat.label}</span>
                   <div className="text-xl font-bold font-mono tracking-tighter"><span className={stat.color}>{stat.value}</span></div>
                 </div>
               ))}
@@ -169,11 +202,11 @@ function App() {
 
           {/* Intelligence Column */}
           <div className="col-span-12 xl:col-span-4 row-span-5 grid grid-rows-12 gap-4">
-            <div className="row-span-5">
+            <div className="row-span-5 relative group">
               <Leaderboard stocks={stocks} />
             </div>
             <div className="row-span-4">
-              <AlertsFeed alerts={alerts} />
+              <AlertsFeed alerts={alerts} onAlertClick={handleAlertClick} />
             </div>
             <div className="row-span-3">
               <InsightsPanel />
