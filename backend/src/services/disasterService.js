@@ -1,9 +1,40 @@
 const axios = require('axios');
 const db = require('../config/db');
+const Parser = require('rss-parser');
 
 const { parse } = require('csv-parse/sync');
 
+const parser = new Parser();
+
 class DisasterService {
+  async fetchGDACS() {
+    try {
+      const feed = await parser.parseURL('https://www.gdacs.org/xml/rss.xml');
+      
+      for (const item of feed.items) {
+        const { title, link, contentSnippet, isoDate, guid } = item;
+        
+        // Extract magnitude and type from title if possible, or use defaults
+        // GDACS titles often look like "Green alert for flood in Angola"
+        let type = 'disaster';
+        if (title.toLowerCase().includes('flood')) type = 'flood';
+        if (title.toLowerCase().includes('earthquake')) type = 'earthquake';
+        if (title.toLowerCase().includes('cyclone')) type = 'cyclone';
+        if (title.toLowerCase().includes('volcano')) type = 'volcano';
+
+        await db.query(
+          `INSERT INTO events (external_id, type, magnitude, latitude, longitude, region, timestamp)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (external_id) DO NOTHING`,
+          [guid, type, 0, 0, 0, title, new Date(isoDate)]
+        );
+      }
+      console.log(`Synced ${feed.items.length} GDACS events.`);
+    } catch (err) {
+      console.error('Error fetching GDACS data:', err.message);
+    }
+  }
+
   async fetchEarthquakes() {
     try {
       const response = await axios.get('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson');
@@ -96,11 +127,13 @@ class DisasterService {
 
   startPolling() {
     setInterval(() => {
+      this.fetchGDACS();
       this.fetchEarthquakes();
       this.fetchWildfires();
       this.fetchWeatherAlerts();
-    }, 5 * 60 * 1000);
+    }, 15 * 60 * 1000);
     
+    this.fetchGDACS();
     this.fetchEarthquakes();
     this.fetchWildfires();
     this.fetchWeatherAlerts();
