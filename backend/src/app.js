@@ -16,7 +16,12 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Routes (Placeholder)
+// Routes
+const ingestRoutes = require('./routes/ingest');
+const eventRoutes = require('./routes/events');
+app.use('/api/ingest', ingestRoutes);
+app.use('/api/events', eventRoutes);
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'disaster-alpha-backend' });
 });

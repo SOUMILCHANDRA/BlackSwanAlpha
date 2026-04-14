@@ -87,6 +87,21 @@ function App() {
   ]);
 
   useEffect(() => {
+    // Initial fetch of events
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/events');
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setRawEvents(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch events:', err);
+      }
+    };
+
+    fetchEvents();
+
     socket.on('new_disaster', (event) => {
       setRawEvents(prev => [event, ...prev]);
     });
@@ -100,7 +115,10 @@ function App() {
       }, ...prev]);
     });
 
-    return () => socket.off();
+    return () => {
+      socket.off('new_disaster');
+      socket.off('stock_anomaly');
+    };
   }, []);
 
   const handleAlertClick = (alert) => {

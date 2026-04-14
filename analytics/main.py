@@ -72,6 +72,67 @@ def detect_spike(data: DetectionRequest):
         is_anomaly=abs(z_score) > 2.0
     )
 
+@app.get("/ingest/emdat")
+async def ingest_emdat(file_path: str):
+    try:
+        # Load EMDAT Excel file
+        xl = pd.ExcelFile(file_path)
+        df = None
+        
+        # Try to find the data sheet (often has many columns or specific keywords)
+        for sheet_name in xl.sheet_names:
+            temp_df = xl.parse(sheet_name)
+            if 'Dis No' in temp_df.columns or 'Disaster Type' in temp_df.columns:
+                df = temp_df
+                break
+        
+        if df is None:
+            # Fallback to first sheet if keywords not found
+            df = xl.parse(xl.sheet_names[0])
+        
+        # Skip header rows if necessary (EMDAT often has a few rows of metadata at top)
+        # We look for the row where 'Dis No' appears
+        if 'Dis No' not in df.columns:
+            # Search in first few rows
+            for i in range(10):
+                if 'Dis No' in df.iloc[i].values:
+                    df.columns = df.iloc[i]
+                    df = df.iloc[i+1:].reset_index(drop=True)
+                    break
+
+        required_cols = ['Dis No', 'Year', 'Disaster Type', 'Country']
+        for col in required_cols:
+            if col not in df.columns:
+                raise HTTPException(status_code=400, detail=f"Missing required column: {col}")
+        
+        events = []
+        # Filter for rows with coordinates
+        geo_df = df.dropna(subset=['Latitude', 'Longitude'])
+        
+        for _, row in geo_df.iterrows():
+            # Create a timestamp from Year/Month/Day if possible, else just use Year
+            month = int(row['Month']) if not pd.isna(row.get('Month')) else 1
+            day = int(row['Day']) if not pd.isna(row.get('Day')) else 1
+            
+            try:
+                timestamp = f"{int(row['Year'])}-{month:02d}-{day:02d}T00:00:00Z"
+            except:
+                timestamp = f"{int(row['Year'])}-01-01T00:00:00Z"
+
+            events.append({
+                "external_id": str(row['Dis No']),
+                "type": str(row['Disaster Type']).lower(),
+                "latitude": float(row['Latitude']),
+                "longitude": float(row['Longitude']),
+                "region": f"{row['Location']}, {row['Country']}" if not pd.isna(row.get('Location')) else str(row['Country']),
+                "timestamp": timestamp,
+                "magnitude": float(row['Magnitude']) if not pd.isna(row.get('Magnitude')) else 0.0
+            })
+            
+        return {"status": "success", "count": len(events), "events": events[:100]} # Limit for sanity
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

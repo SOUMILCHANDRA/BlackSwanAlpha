@@ -7,3 +7,4 @@ scipy
 redis
 python-dotenv
 yfinance
+openpyxl
