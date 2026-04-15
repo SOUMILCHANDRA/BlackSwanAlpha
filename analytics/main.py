@@ -4,6 +4,9 @@ import pandas as pd
 from typing import List, Optional
 from pydantic import BaseModel
 import yfinance as yf
+from satellite_service import get_ndvi_statistics
+from openmeteo_service import get_weather_context, get_airspace_density
+
 
 app = FastAPI(title="Disaster Alpha Analytics Engine")
 
@@ -22,6 +25,19 @@ class SpikeResult(BaseModel):
     change_percent: float
     z_score: float
     is_anomaly: bool
+
+class SatelliteStatsRequest(BaseModel):
+    bbox: List[float]
+    from_date: str
+    to_date: str
+
+class EventAnalysisRequest(BaseModel):
+    event_id: str
+    type: str
+    lat: float
+    lon: float
+    timestamp: str
+
 
 @app.get("/market/price/{ticker}")
 async def get_market_price(ticker: str):
@@ -132,6 +148,55 @@ async def ingest_emdat(file_path: str):
         return {"status": "success", "count": len(events), "events": events[:100]} # Limit for sanity
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/satellite/statistics")
+async def get_satellite_stats(data: SatelliteStatsRequest):
+    try:
+        stats = get_ndvi_statistics(
+            bbox=data.bbox,
+            from_date=data.from_date,
+            to_date=data.to_date
+        )
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analyze/event")
+async def analyze_event(data: EventAnalysisRequest):
+    """
+    Comprehensive event analysis integrating:
+    - Sentinel Hub (Satellite Imagery/Statistics)
+    - Open-Meteo (Historical Weather Context)
+    - FIRMS/GDACS/USGS (via event type and location)
+    """
+    # 0.05 degree offset for approx 5km radius
+    bbox = [data.lon - 0.05, data.lat - 0.05, data.lon + 0.05, data.lat + 0.05]
+    
+    intelligence = {
+        "weather": get_weather_context(data.lat, data.lon, data.timestamp),
+        "airspace": get_airspace_density(bbox)
+    }
+    
+    # Only perform expensive satellite analysis for relevant disaster types
+    satellite_relevant = ["wildfire", "flood", "hurricane", "cyclone", "storm"]
+    if data.type.lower() in satellite_relevant:
+        try:
+            # Check NDVI for vegetation health (useful for fires/droughts/floods)
+            stats = get_ndvi_statistics(
+                bbox=bbox,
+                from_date=data.timestamp,
+                to_date=data.timestamp
+            )
+            intelligence["satellite"] = stats
+        except Exception as e:
+            intelligence["satellite_error"] = str(e)
+            
+    return {
+        "status": "success",
+        "event_id": data.event_id,
+        "intelligence": intelligence
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
