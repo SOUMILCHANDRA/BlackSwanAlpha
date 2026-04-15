@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: disaster_alpha
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
